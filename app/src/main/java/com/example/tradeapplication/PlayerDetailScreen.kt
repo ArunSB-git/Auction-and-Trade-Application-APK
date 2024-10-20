@@ -28,7 +28,7 @@ import coil.compose.rememberImagePainter
 @Composable
 fun CategoryDetailScreen(category: Player, navController: NavController) {
     // Define the border color based on the player's status
-    val borderColor = if (category.status == "available") Color.Green else Color.Red
+    val borderColor = if (category.status == "available") {Color.Green}else if(category.status == "sold"){Color.Red} else Color.Yellow
 
     Column(
         modifier = Modifier
