@@ -39,10 +39,6 @@ fun CategoryDetailScreen(category: Player, navController: NavController) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = { navController.navigate(Screen.playerScreen.route) }, Modifier.padding(top = 16.dp)) {
-            Text(text = "Go back")
-        }
-
         // Create a separate Column for the image and status text
         Column(
             modifier = Modifier
