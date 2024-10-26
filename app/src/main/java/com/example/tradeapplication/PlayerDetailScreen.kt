@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoryDetailScreen(category: Player, navController: NavController) {
+fun CategoryDetailScreen(category: Player, userId: Int, navController: NavController) {
     val borderColor = when (category.status) {
         "available" -> Color.Green
         "sold" -> Color.Red
@@ -79,7 +79,9 @@ fun CategoryDetailScreen(category: Player, navController: NavController) {
             if (expanded.value) {
                 Column(modifier = Modifier.padding(8.dp)) {
                     Text(text = "Nationality: ${category.nationality.uppercase()}")
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(text = "Market Value: ${formatAuctionPrice(category.auctionPrice)}")
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row {
                         Text(text = "Status: ")
                         Text(text = "${category.status.uppercase()}", color = borderColor)
@@ -97,16 +99,16 @@ fun CategoryDetailScreen(category: Player, navController: NavController) {
                         label = { Text("Enter Bid Amount           X 1,000,000") },
                         keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                     )
-
+                    Spacer(modifier = Modifier.height(8.dp))
                     // Display formatted bid amount
                     val bidValueInMillions = bidAmount.value.toIntOrNull()?.times(1_000_000) ?: 0
                     Text(text = "Bid Amount: ${formatBidAmount(bidValueInMillions)}")
-
+                    Spacer(modifier = Modifier.height(8.dp))
                     // Bid Button
                     Button(onClick = {
                         val bidValue = bidAmount.value.toIntOrNull()
                         if (bidValue != null) {
-                            placeBid(category.playerid, bidValue, snackbarHostState)
+                            placeBid(category.playerid, bidValue, userId, snackbarHostState) // Pass userId to placeBid
                         }
                     }) {
                         Text("Place Bid")
@@ -123,13 +125,12 @@ fun CategoryDetailScreen(category: Player, navController: NavController) {
     }
 }
 
-private const val USER_ID = 9 // Constant for user ID
 
-private fun placeBid(playerId: Int, bidValue: Int, snackbarHostState: SnackbarHostState) {
+
+private fun placeBid(playerId: Int, bidValue: Int, userId: Int, snackbarHostState: SnackbarHostState) {
     CoroutineScope(Dispatchers.IO).launch {
         val bidAmount = bidValue * 1_000_000 // Multiply by 1 million
-        val response = bidService.placeBid(BidRequest(USER_ID, playerId, bidAmount))
-
+        val response = bidService.placeBid(BidRequest(userId, playerId, bidAmount))
         // Handle the response
         when (response.code()) {
             201 -> {
