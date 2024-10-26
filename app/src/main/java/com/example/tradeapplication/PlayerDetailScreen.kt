@@ -2,79 +2,150 @@ package com.example.tradeapplication
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberImagePainter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryDetailScreen(category: Player, navController: NavController) {
-    // Define the border color based on the player's status
-    val borderColor = if (category.status == "available") {Color.Green}else if(category.status == "sold"){Color.Red} else Color.Yellow
+    val borderColor = when (category.status) {
+        "available" -> Color.Green
+        "sold" -> Color.Red
+        else -> Color.Yellow
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    val expanded = remember { mutableStateOf(false) }
+    val bidAmount = remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Create a separate Column for the image and status text
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .wrapContentSize()
-                .border(2.dp, borderColor) // Add border here around the image
-                .padding(16.dp) // Inner padding for the image and status
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = rememberImagePainter(category.playerImage),
-                contentDescription = null,
-                modifier = Modifier
-                    .wrapContentSize()
-                    .aspectRatio(1f)
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
-            // Center the player's name
-            Text(text = category.playername.uppercase(), textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.CenterHorizontally), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+
+            Column(
+                modifier = Modifier
+                    .border(2.dp, borderColor)
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
+                Image(
+                    painter = rememberImagePainter(category.playerImage),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = category.playername.uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+
+            // Accordion Header
+            Text(
+                text = "Details",
+                modifier = Modifier
+                    .clickable { expanded.value = !expanded.value }
+                    .padding(8.dp),
+                fontWeight = FontWeight.Bold
+            )
+
+            // Accordion Content
+            if (expanded.value) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = "Nationality: ${category.nationality.uppercase()}")
+                    Text(text = "Market Value: ${formatAuctionPrice(category.auctionPrice)}")
+                    Row {
+                        Text(text = "Status: ")
+                        Text(text = "${category.status.uppercase()}", color = borderColor)
+                    }
+
+
+                    // Bid TextField
+                    TextField(
+                        value = bidAmount.value,
+                        onValueChange = {
+                            if (it.all { char -> char.isDigit() } && it.length <= 3) { // Allow up to 4 digits
+                                bidAmount.value = it
+                            }
+                        },
+                        label = { Text("Enter Bid Amount           X 1,000,000") },
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                    )
+
+                    // Display formatted bid amount
+                    val bidValueInMillions = bidAmount.value.toIntOrNull()?.times(1_000_000) ?: 0
+                    Text(text = "Bid Amount: ${formatBidAmount(bidValueInMillions)}")
+
+                    // Bid Button
+                    Button(onClick = {
+                        val bidValue = bidAmount.value.toIntOrNull()
+                        if (bidValue != null) {
+                            placeBid(category.playerid, bidValue, snackbarHostState)
+                        }
+                    }) {
+                        Text("Place Bid")
+                    }
+                }
+            }
         }
 
-        // Status text with white background and green status value
-        Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text(
-                text = "Status: ",
-                textAlign = TextAlign.Center,
-                color = Color.White
-            )
-            Text(
-                text = category.status.uppercase(),
-                textAlign = TextAlign.Center,
-                color = if (category.status == "available") Color.Green else Color.Red
-            )
-        }
-        Text(text = "Nationality: ${category.nationality.uppercase()}")
-        Text(text = "Market Value: ${formatAuctionPrice(category.auctionPrice)}")
+        // Snackbar positioned at the top
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
+}
+
+private const val USER_ID = 9 // Constant for user ID
+
+private fun placeBid(playerId: Int, bidValue: Int, snackbarHostState: SnackbarHostState) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val bidAmount = bidValue * 1_000_000 // Multiply by 1 million
+        val response = bidService.placeBid(BidRequest(USER_ID, playerId, bidAmount))
+
+        // Handle the response
+        when (response.code()) {
+            201 -> {
+                showSnackbar(snackbarHostState, "Bidded successfully", Color.Green)
+            }
+            400 -> {
+                val errorResponse = response.errorBody()?.string()
+                showSnackbar(snackbarHostState, "Player was bidded already", Color.Red)
+            }
+            else -> showSnackbar(snackbarHostState, "Unexpected error", Color.Red)
+        }
+    }
+}
+
+private suspend fun showSnackbar(snackbarHostState: SnackbarHostState, message: String, color: Color) {
+    snackbarHostState.showSnackbar(message)
 }
 
 fun formatAuctionPrice(price: Int): String {
@@ -85,3 +156,20 @@ fun formatAuctionPrice(price: Int): String {
     }
 }
 
+fun formatBidAmount(amount: Int): String {
+    return when {
+        amount >= 1_00_00_000 -> String.format("%.1f CR", amount / 1_00_00_000.0) // Format to Crores
+        amount >= 1_00_000 -> "${amount / 1_00_000} L" // Convert to Lakhs
+        else -> "$amount" // Fallback to original value if less than 1L
+    }
+}
+
+data class BidRequest(val userid: Int, val playerid: Int, val bidAmount: Int)
+
+data class BidResponse(
+    val transactionid: Int,
+    val userid: Int,
+    val playerid: Int,
+    val bidAmount: Int,
+    val status: String
+)
