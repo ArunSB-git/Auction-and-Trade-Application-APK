@@ -97,7 +97,7 @@ fun LoginScreen(viewModel: MainViewModel, onLoginSuccess: (Int, String) -> Unit)
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally) // Center horizontally)
         {
-        //Spacer(modifier = Modifier.height(40.dp))
+
             Image(
                 painter = painterResource(id = R.drawable.logo_color),
                 contentDescription = "Logo",
